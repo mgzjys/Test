@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<!-- saved from url=(0083)file:///C:/Users/liyao/Documents/Atom/Work/Test.html#11.9/40.6588/-73.8956/-17.6/45 -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+    <title></title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <script src="./Test.html#11.9_40.6588_-73.8956_-17.6_45_files/mapbox-gl.js.download"></script>
+    <script src="./Test.html#11.9_40.6588_-73.8956_-17.6_45_files/shapefile@0.6"></script>
+    <script src="./Test.html#11.9_40.6588_-73.8956_-17.6_45_files/echarts-gl.min.js.download"></script>
+    <script src="./Test.html#11.9_40.6588_-73.8956_-17.6_45_files/mapboxgl-token.js.download"></script>
+    <link href="./Test.html#11.9_40.6588_-73.8956_-17.6_45_files/mapbox-gl.css" rel="stylesheet">
+    <style>
+        body { margin:0; padding:0; }
+        #map { position:absolute; top:0; bottom:0; width:100%; }
+    </style>
+</head>
+<body>
+
+<div id="map" class="mapboxgl-map"><div class="mapboxgl-missing-css">Missing Mapbox GL JS CSS</div><div class="mapboxgl-canvas-container mapboxgl-interactive mapboxgl-touch-drag-pan mapboxgl-touch-zoom-rotate"><canvas class="mapboxgl-canvas" tabindex="0" aria-label="Map" width="1920" height="900" style="position: absolute; width: 1920px; height: 900px;"></canvas></div><div class="mapboxgl-control-container"><div class="mapboxgl-ctrl-top-left"></div><div class="mapboxgl-ctrl-top-right"></div><div class="mapboxgl-ctrl-bottom-left"><div class="mapboxgl-ctrl" style="display: block;"><a class="mapboxgl-ctrl-logo" target="_blank" href="https://www.mapbox.com/" aria-label="Mapbox logo"></a></div></div><div class="mapboxgl-ctrl-bottom-right"><div class="mapboxgl-ctrl mapboxgl-ctrl-attrib"><a href="https://www.mapbox.com/about/maps/" target="_blank">© Mapbox</a> <a href="http://www.openstreetmap.org/about/" target="_blank">© OpenStreetMap</a> <a class="mapbox-improve-map" href="https://www.mapbox.com/feedback/?owner=mapbox&amp;id=dark-v9&amp;access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4M29iazA2Z2gycXA4N2pmbDZmangifQ.-g_vE53SD2WrJ6tFX7QHmA#/-73.8956/40.6588/11.9/-17.6/45" target="_blank">Improve this map</a></div></div></div></div>
+<script>
+mapboxgl.accessToken = 'pk.eyJ1IjoibWd6anlzIiwiYSI6ImNqOHg4dTYyZzF3c2wzMW1iNXc2cXNteTAifQ.kaPEfBr4GPlJfIeLdAU9Vg';
+
+
+
+var map = new mapboxgl.Map({
+    style: 'mapbox://styles/mapbox/dark-v9',
+    center: [-74.0066, 40.7135],
+    zoom: 15,
+    pitch: 45,
+    bearing: -17.6,
+    hash: true,
+    container: 'map'
+});
+
+// The 'building' layer in the mapbox-streets vector source contains building-height
+// data from OpenStreetMap.
+map.on('load', function() {
+    // Insert the layer beneath any symbol layer.
+    var layers = map.getStyle().layers.reverse();
+    var labelLayerIdx = layers.findIndex(function (layer) {
+        return layer.type !== 'symbol';
+    });
+    var labelLayerId = labelLayerIdx !== -1 ? layers[labelLayerIdx].id : undefined;
+    map.addLayer({
+        'id': '3d-buildings',
+        'source': 'composite',
+        'source-layer': 'building',
+        'filter': ['==', 'extrude', 'true'],
+        'type': 'fill-extrusion',
+        'minzoom': 15,
+        'paint': {
+            'fill-extrusion-color': '#f9f0f0',
+            'fill-extrusion-height': {
+                'type': 'identity',
+                'property': 'height'
+            },
+            'fill-extrusion-base': {
+                'type': 'identity',
+                'property': 'min_height'
+            },
+            'fill-extrusion-opacity': .6
+        }
+    }, labelLayerId);
+});
+
+
+
+
+
+
+mapboxgl.accessToken = mapboxglToken;
+
+var ENCODE_SCALE = 1e6;
+function decodeLine(line) {
+
+    var result = [];
+    var prevX = line[0];
+    var prevY = line[1];
+
+    for (var i = 0; i < line[2].length; i += 2) {
+        var x = line[2].charCodeAt(i) - 64;
+        var y = line[2].charCodeAt(i + 1) - 64;
+        // ZigZag decoding
+        x = (x >> 1) ^ (-(x & 1));
+        y = (y >> 1) ^ (-(y & 1));
+        // Delta deocding
+        x += prevX;
+        y += prevY;
+
+        prevX = x;
+        prevY = y;
+        // Dequantize
+        result.push([x / ENCODE_SCALE, y / ENCODE_SCALE, 10]);
+    }
+
+    return result;
+}
+
+var geoJSON = {
+    features: []
+};
+var regions = [];
+var readShp = new Promise(function (resolve, reject) {
+    shapefile.open('/data/Test_street_income.shp', '/data/Test_street_income.dbf')
+        .then(source => source.read()
+            .then(function append(result) {
+                if (result.done) {
+                    resolve();
+                    return;
+                }
+                var feature = result.value;
+                feature.properties.name = geoJSON.features.length + '';
+                regions.push({
+                    name: geoJSON.features.length + '',
+                    value: 1,
+                    height: feature.properties.SHAPE_leng * 10000
+                })
+                geoJSON.features.push(feature);
+                return source.read().then(append);
+            })
+        );
+});
+
+myChart.showLoading();
+
+Promise.all([$.getJSON('/data/Test_demo.json'), readShp])
+    .then(function ([data, lastFeature]) {
+
+        var lines = data.map(function (track) {
+            return {
+                coords: decodeLine(track)
+            };
+        });
+
+        myChart.hideLoading();
+
+        echarts.registerMap('buildings', geoJSON);
+
+        myChart.setOption({
+            mapbox: {
+                center:  [-74.0066, 40.7135],
+                zoom: 14,
+                pitch: 50,
+                bearing: -10,
+                altitudeScale: 2,
+                style: 'mapbox://styles/mapbox/dark-v9',
+                postEffect: {
+                    enable: true,
+                    screenSpaceAmbientOcclusion: {
+                        enable: true,
+                        intensity: 1.2,
+                        radius: 6,
+                        quality: 'high'
+                    },
+                    screenSpaceReflection: {
+                        enable: true
+                    }
+                },
+                light: {
+                    main: {
+                        intensity: 1,
+                        shadow: true,
+                        shadowQuality: 'high'
+                    },
+                    ambient: {
+                        intensity: 0.
+                    },
+                    ambientCubemap: {
+                        texture: '/data/data-1491838644249-ry33I7YTe.hdr',
+                        exposure: 1,
+                        diffuseIntensity: 0.5,
+                        specularIntensity: 2
+                    }
+                }
+            },
+            series: [{
+                type: 'lines3D',
+
+                coordinateSystem: 'mapbox',
+
+                effect: {
+                    show: true,
+                    constantSpeed: 5,
+                    trailWidth: 2,
+                    trailLength: 0.8,
+                    trailOpacity: 1,
+                    spotIntensity: 10
+                },
+
+                blendMode: 'lighter',
+
+                polyline: true,
+
+                lineStyle: {
+                    width: 0.1,
+                    color: 'rgb(200, 40, 0)',
+                    opacity: 0.
+                },
+
+                data: {
+                    count: function () {
+                        return lines.length;
+                    },
+                    getItem: function (idx) {
+                        return lines[idx]
+                    }
+                }
+            }, {
+                type: 'map3D',
+                map: 'buildings',
+
+                coordinateSystem: 'mapbox',
+                shading: 'realistic',
+                silent: true,
+
+                instancing: true,
+
+                data: regions,
+
+                realisticMaterial: {
+                    metalness: 1,
+                    roughness: 0.2,
+                }
+            }]
+        });
+    });
+
+window.addEventListener('keydown', function () {
+    myChart.dispatchAction({
+        type: 'lines3DToggleEffect',
+        seriesIndex: 0
+    });
+});
+
+
+
+
+
+
+</script>
+
+
+
+</body></html>
